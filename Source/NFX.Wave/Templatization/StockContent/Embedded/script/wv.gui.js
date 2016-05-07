@@ -2718,27 +2718,36 @@ WAVE.GUI = (function(){
            factiveTab.node().className += " active";
            factiveTab.showContent();
        }
-       tabControl.selectTab = function(tab) {
-           var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tab: tab, abort: false };
-           tabEventInvoke(published.EVT_TABS_TAB_CHANGE, evtArgsBefore);
-           if (evtArgsBefore.abort === true) return;
 
+       function tabAction(tab, action) {
+           if (!tab) return;
+           if (!action) return;
            // if tab argument type is Tab remove tab 
            if (tab instanceof Tab) {
-               tabControl.__setActive(tab);
+               action(tab);
            }
            // if 'tab' argument type is String it is assumed that 'tab' is id of the tab 
            if (typeof (tab) === 'string' || tab instanceof String) {
                tabControl.__filterTabs(function (t) { return t.node().id === tab; },
-                   function(t) {
-                       tabControl.__setActive(t);
+                   function (t) {
+                       action(t);
                        return true;
                    });
            }
            // Number - is index of tab
            if ((typeof (tab) === 'number' || tab instanceof Number) && fChildren.length > tab) {
-               tabControl.__setActive(fChildren[tab]);
+               action(fChildren[tab]);
            }
+       }
+       tabControl.selectTab = function(tab) {
+           var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tab: tab, abort: false };
+           tabEventInvoke(published.EVT_TABS_TAB_CHANGE, evtArgsBefore);
+           if (evtArgsBefore.abort === true) return;
+
+           tabAction(tab, function(t) {
+               tabControl.__setActive(t);
+           });
+       
            var evtArgsAfter = { phase: published.EVT_PHASE_AFTER, tabControl: tabControl, tab: tab };
            tabEventInvoke(published.EVT_TABS_TAB_CHANGE, evtArgsAfter);
 
@@ -2764,22 +2773,10 @@ WAVE.GUI = (function(){
             tabEventInvoke(published.EVT_TABS_TAB_REMOVE, evtArgsBefore);
             if (evtArgsBefore.abort === true) return;
 
-            // if tab argument type is Tab remove tab 
-            if (tab instanceof Tab) {
-                tabControl.__removeTab(tab);
-            }
-            // if 'tab' argument type is String it is assumed that 'tab' is id of the tab 
-            if (typeof (tab) === 'string' || tab instanceof String) {
-                tabControl.__filterTabs(function (t) { return t.node().id === tab; },
-                 function (t, i) {
-                     tabControl.__removeTab(t);
-                     return true;
-                 });
-            }
-            // Number - is index of tab
-            if ((typeof (tab) === 'number' || tab instanceof Number) && fChildren.length > tab) {
-                tabControl.__removeTab(fChildren[tab]);
-            }
+            tabAction(tab, function (t) {
+                tabControl.__removeTab(t);
+            });
+           
             var evtArgsAfter = { phase: published.EVT_PHASE_AFTER, tabControl: tabControl, tab: tab };
             tabEventInvoke(published.EVT_TABS_TAB_REMOVE, evtArgsAfter);
 
