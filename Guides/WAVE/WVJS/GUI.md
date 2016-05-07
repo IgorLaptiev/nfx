@@ -263,7 +263,7 @@ Adds new tab and returns created tab object
 * title - text that showed in tab
 * setActive - if true than new tab will be active 
 * contentDiv - DOM node with content  
-* contentDivID - id of content node, if node doesn't exist, it will be created, using contentHtml. If not set, will be <id> + "content"
+* contentDivID - id of content node, if node doesn't exist, it will be created, using contentHtml. If not set, will be id + "content"
 * contentHtml - string with content html (used only if contentDiv not set)
 * notSelectable - for tabs that can be pressed, but can't be selected 
 * action - action that executed when tab pressed. Arguments (tabControl, tab)
