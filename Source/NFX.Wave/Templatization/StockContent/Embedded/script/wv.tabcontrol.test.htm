@@ -65,6 +65,8 @@
 <body>
 
 <div id="tabCtrl">
+    <div id="tab2content">Tab 2 content</div>
+    <div id="tab4content">Tab 4 content</div>
 </div>
     <script type="text/javascript">
         (function() {
@@ -84,20 +86,24 @@
                 testtab.removeTab(t);
                 t= testtab.addTab({
                     id:"tabGeneral",
-                    title: "Tab 1"
+                    title: "General",
+                    contentHtml:"<p>Tab 1 content</p>"
                 });
                 testtab.addTab({
                     id: "tabDetails",
-                    title: "Tab 2"
+                    title: "Details",
+                    contentDivID: "tab2content"
                 });
                 testtab.addTab({
                     id: "tabOrders",
-                    title: "Tab 3"
+                    title: "Orders",
+                    contentHtml: "<p>Orders tab content</p>"
                 });
                 console.log("Selected - " + testtab.activeTab().node().id + " should be - tabGeneral");
                 testtab.addTab({
                     id: "tab4",
                     title: "Tab 4",
+                    DIVContent:WAVE.id("tab4content"),
                     setActive:true,
                 });
                 console.log("Selected - " + testtab.activeTab().node().id + " should be - tab4");

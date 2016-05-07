@@ -2547,43 +2547,90 @@ WAVE.GUI = (function(){
         var Tab = function (tabInit) {
             tabInit = tabInit || {};
             var tab = this;
-            fTabIDSeed++;
-            var fElmID = "tab_" + fTabIDSeed;
+            var fElmID, fLI, fDIVContent, fDIVContentID, fDIVOwn, fID, fRemoveContent = false;
+            function displayContent() {
 
-            var fLI;
-            var fDIVContent;
-            var fDIVOwn = tabInit.TabUL;
-
-            var fID = (tabInit.id || fTabIDSeed).toString();
-            this.id = function () { return fID; };
-            if (tabInit.id) {
-                fElmID = tabInit.id;
             }
-            var tabTemplateArgs = {
-                id: fElmID,
 
-                wvTab: tabInit.wvTab || fTabTemplateClsArgs.wvTab,
-                wvTabTitle: tabInit.title,
-                wvTabContentID: tabInit.contentDivID || fElmID + 'content'
-            };
+            function init(tabInit) {
 
-            var lihtml = WAVE.strTemplate(TAB_TEMPLATE, tabTemplateArgs);
-            var div = document.createElement('div');
-            div.innerHTML = lihtml;
-            fLI = fDIVOwn.appendChild(div.firstChild);
-            fLI.addEventListener('click', function (e) {
-                if (tabInit.action) {
-                    tabInit.action(tabInit.tabControl, tab);
+                fTabIDSeed++;
+                fElmID = "tab_" + fTabIDSeed;
+
+                fDIVOwn = tabInit.TabUL;
+
+                fID = (tabInit.id || fTabIDSeed).toString();
+                if (tabInit.id) {
+                    fElmID = tabInit.id;
                 }
-                if (!tabInit.notSelectable){
-                    tabInit.tabControl.selectTab(tab);
+
+                fDIVContentID = tabInit.contentDivID || fElmID + 'content';
+                var tabTemplateArgs = {
+                    id: fElmID,
+
+                    wvTab: tabInit.wvTab || fTabTemplateClsArgs.wvTab,
+                    wvTabTitle: tabInit.title,
+                    wvTabContentID: fDIVContentID
+                };
+
+                var lihtml = WAVE.strTemplate(TAB_TEMPLATE, tabTemplateArgs);
+                var tmpdiv = document.createElement('div');
+                tmpdiv.innerHTML = lihtml;
+                fLI = fDIVOwn.appendChild(tmpdiv.firstChild);
+                fLI.addEventListener('click', function(e) {
+                    if (tabInit.action) {
+                        tabInit.action(tabInit.tabControl, tab);
+                    }
+                    if (!tabInit.notSelectable) {
+                        tabInit.tabControl.selectTab(tab);
+                        displayContent();
+                    }
+                });
+                   
+                if (tabInit.DIVContent) {
+                    fDIVContent = tabInit.DIVContent;
+                    fDIVContentID = fDIVContent.id;
                 }
-            });
+                if (!fDIVContent) {
+                    fDIVContent = WAVE.id(fDIVContentID);
+                }
+                if (!fDIVContent) {
+                    fDIVContent = document.createElement('div');
+                    fDIVOwn.parentNode.appendChild(fDIVContent);
+                    fDIVContent.id = fDIVContentID;
+                    if (tabInit.contentHtml) {
+                        fDIVContent.innerHTML = tabInit.contentHtml;
+                    }
+                    fRemoveContent = true;
+                }
+                tab.hideContent();
+            }
+
+            this.id = function () { return fID; };
+
             this.node = function () { return fLI; }
 
-            this.remove = function() {
-                fDIVOwn.removeChild(fLI);
+            this.remove = function () {
+                if (fDIVOwn) {
+                    fDIVOwn.removeChild(fLI);
+                }
+                if (fRemoveContent && fDIVContent) {
+                    fDIVContent.parentNode.removeChild(fDIVContent);
+                }
             }
+
+            this.hideContent = function() {
+                if (fDIVContent) {
+                    fDIVContent.style.display = "none";
+                }
+            }
+
+            this.showContent = function () {
+                if (fDIVContent) {
+                    fDIVContent.style.display = "block";
+                }
+            }
+            init(tabInit);
         }
 
         if (!init || !init.DIV) throw "TabControl.ctor(init.DIV)";
@@ -2602,7 +2649,7 @@ WAVE.GUI = (function(){
         var html = WAVE.strTemplate(TAB_CONTROL_TEMPLATE, tabCtrlTemplateClsArgs);
         var div = document.createElement('div');
         div.innerHTML = html;
-        var fTabUL = tabsDIV.appendChild(div.firstChild);
+        var fTabUL = tabsDIV.insertBefore(div.firstChild,tabsDIV.firstChild);
 
         var fChildren = [];
         this.children = function () { return WAVE.arrayShallowCopy(fChildren); };
@@ -2665,9 +2712,11 @@ WAVE.GUI = (function(){
        tabControl.__setActive = function (tab) {
            if (factiveTab) {
                removeClass(factiveTab.node(), "active");
+               factiveTab.hideContent();
            }
            factiveTab = tab;
            factiveTab.node().className += " active";
+           factiveTab.showContent();
        }
        tabControl.selectTab = function(tab) {
            var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tab: tab, abort: false };
@@ -2680,7 +2729,7 @@ WAVE.GUI = (function(){
            }
            // if 'tab' argument type is String it is assumed that 'tab' is id of the tab 
            if (typeof (tab) === 'string' || tab instanceof String) {
-               tabControl.__filterTabs(function(t) { return t.id === tab; },
+               tabControl.__filterTabs(function (t) { return t.node().id === tab; },
                    function(t) {
                        tabControl.__setActive(t);
                        return true;
