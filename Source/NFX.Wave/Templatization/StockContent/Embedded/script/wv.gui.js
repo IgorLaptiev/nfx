@@ -279,8 +279,18 @@ WAVE.GUI = (function(){
         //}               
 
         //ObjectInspector {
-        CLS_OBJECTINSPECTOR_EDITOR: 'wvObjectInspectorEditor'
+        CLS_OBJECTINSPECTOR_EDITOR: 'wvObjectInspectorEditor',
         // { ObjectInspector
+
+        // TabControl {
+        CLS_TAB_CONTROL:'wvTabControl',
+        CLS_TAB: 'wvTab',
+
+        EVT_TABS_TAB_ADD: 'tab-add',
+        EVT_TABS_TAB_REMOVE: 'tab-remove',
+        EVT_TABS_TAB_CHANGE: 'tab-change',
+        // { TabControl
+
     };
 
     var CURTAIN_ZORDER  = 500000;
@@ -2529,7 +2539,206 @@ WAVE.GUI = (function(){
       
       $(document).on("mouseup touchend", onMouseUp);
     };
+    var fTabIDSeed = 0;
+    published.TabControl = function (init) {
 
+        var TAB_CONTROL_TEMPLATE = "<ul class='@wvTabContol@'></ul>";
+        var TAB_TEMPLATE = "<li id='@id@' class='@wvTab@'><a href='#@wvTabContentID@'>@wvTabTitle@</a></li>";
+        var Tab = function (tabInit) {
+            tabInit = tabInit || {};
+            var tab = this;
+            fTabIDSeed++;
+            var fElmID = "tab_" + fTabIDSeed;
+
+            var fLI;
+            var fDIVContent;
+            var fDIVOwn = tabInit.TabUL;
+
+            var fID = (tabInit.id || fTabIDSeed).toString();
+            this.id = function () { return fID; };
+            if (tabInit.id) {
+                fElmID = tabInit.id;
+            }
+            var tabTemplateArgs = {
+                id: fElmID,
+
+                wvTab: tabInit.wvTab || fTabTemplateClsArgs.wvTab,
+                wvTabTitle: tabInit.title,
+                wvTabContentID: tabInit.contentDivID || fElmID + 'content'
+            };
+
+            var lihtml = WAVE.strTemplate(TAB_TEMPLATE, tabTemplateArgs);
+            var div = document.createElement('div');
+            div.innerHTML = lihtml;
+            fLI = fDIVOwn.appendChild(div.firstChild);
+            fLI.addEventListener('click', function (e) {
+                if (tabInit.action) {
+                    tabInit.action(tabInit.tabControl, tab);
+                }
+                if (!tabInit.notSelectable){
+                    tabInit.tabControl.selectTab(tab);
+                }
+            });
+            this.node = function () { return fLI; }
+
+            this.remove = function() {
+                fDIVOwn.removeChild(fLI);
+            }
+        }
+
+        if (!init || !init.DIV) throw "TabControl.ctor(init.DIV)";
+
+        var tabControl = this;
+        WAVE.extend(tabControl, WAVE.EventManager);
+
+        var tabsDIV = init.DIV;
+
+        var tabCtrlTemplateClsArgs = {
+            wvTabContol: init.wvTabContol || published.CLS_TAB_CONTROL
+        }
+        var fTabTemplateClsArgs = {
+            wvTab: init.wvTab || published.CLS_TAB
+        }
+        var html = WAVE.strTemplate(TAB_CONTROL_TEMPLATE, tabCtrlTemplateClsArgs);
+        var div = document.createElement('div');
+        div.innerHTML = html;
+        var fTabUL = tabsDIV.appendChild(div.firstChild);
+
+        var fChildren = [];
+        this.children = function () { return WAVE.arrayShallowCopy(fChildren); };
+        this.__children = function () { return fChildren; };
+        var factiveTab = null;
+        this.activeTab = function () { return factiveTab; }
+
+        var fSupressEvents = init.supressEvents === true;
+        this.supressEvents = function (val) {
+            if (typeof (val) === tUNDEFINED) return fSupressEvents;
+            fSupressEvents = val;
+        };
+
+        function tabEventInvoke(evt, args) {
+            if (!fSupressEvents) tabControl.eventInvoke(evt, args);
+        }
+
+       tabControl.addTab = function (tabInit) {
+            tabInit = tabInit || {};
+            var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tabInit: tabInit, abort: false };
+            tabEventInvoke(published.EVT_TABS_TAB_ADD, evtArgsBefore);
+            if (evtArgsBefore.abort === true) return;
+
+            tabInit.TabUL = fTabUL;
+            tabInit.tabControl = tabControl;
+            var tab = new Tab(tabInit);
+            fChildren.push(tab);
+            if (fChildren.length === 1 || tabInit.setActive) {
+                tabControl.selectTab(tab);
+            }
+            
+            var evtArgsAfter = { phase: published.EVT_PHASE_AFTER, tabControl: tabControl, tab: tab };
+            tabEventInvoke(published.EVT_TABS_TAB_ADD, evtArgsAfter);
+
+            return tab;
+       }
+
+       tabControl.__filterTabs = function (filterPredicat, action) {
+           for (var i in fChildren) {
+               if (fChildren.hasOwnProperty(i)) {
+                   if (filterPredicat(fChildren[i])) {
+                       if (action(fChildren[i],i))
+                           break;
+                   }
+               }
+           }
+           return null;
+       }
+       function removeClass(element, remove) {
+           var newClassName = "";
+           var i;
+           var classes = element.className.split(" ");
+           for (i = 0; i < classes.length; i++) {
+               if (classes[i] !== remove) {
+                   newClassName += classes[i] + " ";
+               }
+           }
+           element.className = newClassName;
+       }
+       tabControl.__setActive = function (tab) {
+           if (factiveTab) {
+               removeClass(factiveTab.node(), "active");
+           }
+           factiveTab = tab;
+           factiveTab.node().className += " active";
+       }
+       tabControl.selectTab = function(tab) {
+           var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tab: tab, abort: false };
+           tabEventInvoke(published.EVT_TABS_TAB_CHANGE, evtArgsBefore);
+           if (evtArgsBefore.abort === true) return;
+
+           // if tab argument type is Tab remove tab 
+           if (tab instanceof Tab) {
+               tabControl.__setActive(tab);
+           }
+           // if 'tab' argument type is String it is assumed that 'tab' is id of the tab 
+           if (typeof (tab) === 'string' || tab instanceof String) {
+               tabControl.__filterTabs(function(t) { return t.id === tab; },
+                   function(t) {
+                       tabControl.__setActive(t);
+                       return true;
+                   });
+           }
+           // Number - is index of tab
+           if ((typeof (tab) === 'number' || tab instanceof Number) && fChildren.length > tab) {
+               tabControl.__setActive(fChildren[tab]);
+           }
+           var evtArgsAfter = { phase: published.EVT_PHASE_AFTER, tabControl: tabControl, tab: tab };
+           tabEventInvoke(published.EVT_TABS_TAB_CHANGE, evtArgsAfter);
+
+           return tab;
+       } 
+       tabControl.__removeTab = function (tab) {
+           WAVE.arrayDelete(fChildren, tab);
+           tab.remove();
+       };
+
+      
+       tabControl.removeAll = function () {
+           var children = WAVE.arrayShallowCopy(fChildren);
+           for (var i in children) {
+               if (children.hasOwnProperty(i)) {
+                   tabControl.removeTab(children[i]);
+               }
+           }
+       };
+
+        tabControl.removeTab = function(tab) {
+            var evtArgsBefore = { phase: published.EVT_PHASE_BEFORE, tabControl: tabControl, tab: tab, abort: false };
+            tabEventInvoke(published.EVT_TABS_TAB_REMOVE, evtArgsBefore);
+            if (evtArgsBefore.abort === true) return;
+
+            // if tab argument type is Tab remove tab 
+            if (tab instanceof Tab) {
+                tabControl.__removeTab(tab);
+            }
+            // if 'tab' argument type is String it is assumed that 'tab' is id of the tab 
+            if (typeof (tab) === 'string' || tab instanceof String) {
+                tabControl.__filterTabs(function (t) { return t.node().id === tab; },
+                 function (t, i) {
+                     tabControl.__removeTab(t);
+                     return true;
+                 });
+            }
+            // Number - is index of tab
+            if ((typeof (tab) === 'number' || tab instanceof Number) && fChildren.length > tab) {
+                tabControl.__removeTab(fChildren[tab]);
+            }
+            var evtArgsAfter = { phase: published.EVT_PHASE_AFTER, tabControl: tabControl, tab: tab };
+            tabEventInvoke(published.EVT_TABS_TAB_REMOVE, evtArgsAfter);
+
+            return tab;
+        }
+       
+    }
+  
     return published;
 }());//WAVE.GUI
 
