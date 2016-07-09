@@ -25,7 +25,6 @@ using NUnit.Framework;
 using NFX.IO;
 using NFX.Environment;
 using NFX.Serialization.Slim;
-using NFX.RecordModel;
 using NFX.ApplicationModel;
 
 namespace NFX.NUnit.Serialization
@@ -222,10 +221,11 @@ namespace NFX.NUnit.Serialization
 
             var deser = s.Deserialize(ms);
 
-            Console.WriteLine( deser.ToString(), deser.GetType().FullName);
+            Console.WriteLine( deser.ToString() );
+            Assert.IsTrue(deser is NFX.Serialization.JSON.JSONDataMap);
 
             var map2 = deser as NFX.Serialization.JSON.JSONDataMap;
-                                                                           
+
 
             Assert.AreEqual("1", map2["flag"]);
             Assert.AreEqual("22", map2["FLAG"]);
@@ -255,7 +255,8 @@ namespace NFX.NUnit.Serialization
 
             var deser = s.Deserialize(ms);
 
-            Console.WriteLine( deser.ToString(), deser.GetType().FullName);
+            Console.WriteLine( deser.ToString());
+            Assert.IsTrue(deser is NFX.Serialization.JSON.JSONDataMap);
 
             var map2 = deser as NFX.Serialization.JSON.JSONDataMap;
                                                                            
@@ -945,39 +946,6 @@ namespace NFX.NUnit.Serialization
 
 
 
-         [TestCase]
-        public void SingleExampleRecord()
-        {
-          using(var ms = new MemoryStream())
-          {
-            var s = new SlimSerializer(SlimFormat.Instance);
-             
-            var r1 = makeValidPostedRec();
-            
-            
-            r1.Edit();
-             r1.fldName.Value = "Frank Borland";
-             r1.fldSex.Value = "M";
-            r1.Post();
-
-            
-            s.Serialize(ms, r1);
-            Console.WriteLine("ExampleRecord serialized size is " + ms.Length.ToString());
-            ms.Seek(0, SeekOrigin.Begin);
-
-            var r2 = (ExampleRecord)s.Deserialize(ms);
-            
-            Assert.AreEqual(DataState.Viewing, r2.State);
-            Assert.AreEqual(r1.TableName, r2.TableName);
-            Assert.AreEqual(r1.fldName.FieldName, r2.fldName.FieldName);
-            Assert.AreEqual(r2, r2.fldName.Record);
-            Assert.AreEqual("Frank Borland", r2.fldName.Value);
-            Assert.AreEqual("M", r2.fldSex.Value);
-
-          }
-        }
-
-
         [TestCase]
         public void ConcurrentDictionaryThatUsesOnAttributes()
         {
@@ -1008,9 +976,8 @@ namespace NFX.NUnit.Serialization
           using(var ms = new MemoryStream())
           {
             var treg = new TypeRegistry(TypeRegistry.CommonCollectionTypes,
-                                                TypeRegistry.RecordModelTypes,
-                                                TypeRegistry.BoxedCommonTypes,
-                                                TypeRegistry.BoxedCommonNullableTypes);
+                                        TypeRegistry.BoxedCommonTypes,
+                                        TypeRegistry.BoxedCommonNullableTypes);
             
             var s = new SlimSerializer(SlimFormat.Instance, treg);
              
@@ -1064,9 +1031,8 @@ namespace NFX.NUnit.Serialization
           using(var ms = new MemoryStream())
           {
             var treg = new TypeRegistry(TypeRegistry.CommonCollectionTypes,
-                                                TypeRegistry.RecordModelTypes,
-                                                TypeRegistry.BoxedCommonTypes,
-                                                TypeRegistry.BoxedCommonNullableTypes);
+                                        TypeRegistry.BoxedCommonTypes,
+                                        TypeRegistry.BoxedCommonNullableTypes);
             
             var s = new SlimSerializer(SlimFormat.Instance, treg);
              
@@ -1813,32 +1779,6 @@ namespace NFX.NUnit.Serialization
             }
 
 
-
-
-            private ExampleRecord makeValidPostedRec()
-            {
-              var rec = makeValidRec();
-
-              rec.Post();
-
-              return rec;
-            }
-
-            private ExampleRecord makeValidRec()
-            {
-              var rec = Record.Make<ExampleRecord>();
-
-                  rec.Create();
-                    rec.fldName.Value = "John Frank Bookman";
-                    rec.fldScore.Value = 10;
-                    rec.fldSex.Value = "M";
-                    rec.fldSalary.Value = 75000M;
-                    rec.fldRegistered.Value = true;
-                    rec.fldDOB.Value = DateTime.Parse("June 18, 1955");
-                   // rec.fldMovieNames.Value.Add("Titanic");
-          
-              return rec;
-            }
 
 
             public class ClassA

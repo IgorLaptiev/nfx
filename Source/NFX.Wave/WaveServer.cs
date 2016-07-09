@@ -641,8 +641,8 @@ namespace NFX.Wave
               {
                 //access denied
                 gateAccessDenied = true;
-                listenerContext.Response.StatusCode = SysConsts.STATUS_403;         //todo - need properties for this
-                listenerContext.Response.StatusDescription = SysConsts.STATUS_403_DESCRIPTION;
+                listenerContext.Response.StatusCode = Web.WebConsts.STATUS_403;         //todo - need properties for this
+                listenerContext.Response.StatusDescription = Web.WebConsts.STATUS_403_DESCRIPTION;
                 listenerContext.Response.Close();
 
                 if (m_InstrumentationEnabled) Interlocked.Increment(ref m_Stat_ServerGateDenial);
@@ -789,6 +789,9 @@ namespace NFX.Wave
     
         foreach(var kvp in m_Stat_PortalRequest.AllLongs)
             i.Record( new Instrumentation.ServerPortalRequest(Name+"."+kvp.Key, kvp.Value) );
+
+        var sample = (int)m_Stat_WorkContextBufferedResponseBytes;
+        if (sample!=0) ExternalRandomGenerator.Instance.FeedExternalEntropySample(sample);
      }
 
     #endregion

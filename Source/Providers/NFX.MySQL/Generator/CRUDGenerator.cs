@@ -23,7 +23,6 @@ using System.Text;
 
 using NFX;
 using NFX.DataAccess;
-using NFX.RecordModel;
 using MySql.Data.MySqlClient;
 using NFX.DataAccess.CRUD;
 using NFX.DataAccess.Distributed;
@@ -445,6 +444,11 @@ namespace NFX.DataAccess.MySQL
 
       if (value is GDID)
       {
+        if (((GDID)value).IsZero)
+        {
+          return null;
+        }
+        
         if(store.FullGDIDS)
         {
           value = (object)((GDID)value).Bytes;

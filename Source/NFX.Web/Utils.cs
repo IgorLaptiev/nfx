@@ -42,54 +42,35 @@ namespace NFX.Web
 	    return utcDateTime.ToString("ddd, dd-MMM-yyyy HH':'mm':'ss 'GMT'", DateTimeFormatInfo.InvariantInfo);
     }
 
-#pragma warning disable 1570
+
     /// <summary>
-    /// Parses query string (e.g. "id=457&name=zelemhan") into dictionary (e.g. {{"id", "457"}, {"name", "zelemhan"}})
+    /// Escapes JS literal, replacing / \ \r \n " ' &lt; &gt; &amp; chars with their hex codes
     /// </summary>
-#pragma warning restore 1570
-    public static JSONDataMap ParseQueryString(string query)
+    public static string EscapeJSLiteral(this string value)
     {
-      if (query.IsNullOrWhiteSpace()) return new JSONDataMap();
-
-      var dict = new JSONDataMap();
-      int queryLen = query.Length;
-
-      int startIdx = 0;
-      while (startIdx < queryLen)
+      if (value==null) return null;
+      if (value.Length==0) return string.Empty;
+       
+      var sb = new StringBuilder();
+      for(var i=0; i<value.Length; i++)
       {
-        int ampIdx = query.IndexOf('&', startIdx);
-        int kvLen = (ampIdx != -1) ? ampIdx - startIdx : queryLen - startIdx;
-
-        if (kvLen < 1)
+        var c = value[i];
+        if (c < 0x20 || //space
+            c=='\'' || c=='"' ||
+            c=='/' || c=='\\' || 
+            c=='&' || c=='<'  || c=='>')
         {
-          startIdx = ampIdx + 1;
+          sb.Append(@"\x");
+          var nibble = (c >> 4) & 0x0f; //this works faster than int to string hex
+          sb.Append((char)(nibble<=9 ? '0'+nibble : 'A'+(nibble-10)));
+          nibble =  c & 0x0f;
+          sb.Append((char)(nibble<=9 ? '0'+nibble : 'A'+(nibble-10)));
           continue;
         }
-
-        int eqIdx = query.IndexOf('=', startIdx, kvLen);
-        if (eqIdx == -1)
-        {
-          var key = Uri.UnescapeDataString(query.Substring(startIdx, kvLen));
-          dict.Add(key, null);
-        }
-        else
-        {
-          int keyLen = eqIdx - startIdx;
-          if (keyLen > 0)
-          {
-            string key = Uri.UnescapeDataString(query.Substring(startIdx, keyLen));
-            string val = null;
-            int valLen = kvLen - (eqIdx - startIdx) - 1;
-            if (valLen > 0)
-              val = Uri.UnescapeDataString(query.Substring(eqIdx + 1, kvLen - (eqIdx - startIdx) - 1));
-            dict.Add(key, val);
-          }
-        }
-
-        startIdx += kvLen + 1;
+        
+        sb.Append(c);
       }
-
-      return dict;
+      return sb.ToString();
     }
 
   }

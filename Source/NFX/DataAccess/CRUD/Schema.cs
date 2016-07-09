@@ -24,8 +24,6 @@ using System.Text;
 
 using NFX.Serialization.JSON;
 
-using NFX.RecordModel;
-
 namespace NFX.DataAccess.CRUD
 {
     /// <summary>
@@ -49,6 +47,12 @@ namespace NFX.DataAccess.CRUD
             [Serializable]
             public sealed class FieldDef : INamed, IOrdered, ISerializable, IJSONWritable
             {
+                
+                public FieldDef(string name, Type type, FieldAttribute attr) 
+                {
+                    ctor(name, 0, type, new[]{attr}, null);
+                }
+
                 public FieldDef(string name, Type type, IEnumerable<FieldAttribute> attrs) 
                 {
                     ctor(name, 0, type, attrs, null);
@@ -285,10 +289,23 @@ namespace NFX.DataAccess.CRUD
                 /// </summary>
                 public string GetBackendNameForTarget(string targetName)
                 {
+                    FieldAttribute attr;
+                    return GetBackendNameForTarget(targetName, out attr);
+                }
+
+                /// <summary>
+                /// Returns the name of the field in backend that was possibly overriden for a particular target
+                /// along with store flag
+                /// </summary>
+                public string GetBackendNameForTarget(string targetName, out FieldAttribute attr)
+                {
                     var result = m_Name;
                     var fattr = this[targetName];
-                    if (fattr!=null && fattr.BackendName.IsNotNullOrWhiteSpace()) result = fattr.BackendName;
-
+                    attr = fattr;
+                    if (fattr!=null)
+                    {
+                      if (fattr.BackendName.IsNotNullOrWhiteSpace()) result = fattr.BackendName;
+                    }
                     return result;
                 }
 
@@ -323,19 +340,15 @@ namespace NFX.DataAccess.CRUD
 
                     if (attr.NonUI) return;//nothing to write for NONUI
 
-                    string tp;
-                    if (m_NonNullableType.IsPrimitive)
-                         tp = m_NonNullableType.Name;
-                    else
-                         tp = m_NonNullableType.FullName;
-                   
+                    bool typeIsNullable;
+                    string tp = JSONMappings.MapCLRTypeToJSON(m_Type, out typeIsNullable);
 
                     var map = new Dictionary<string, object>
                     {
-                      {"Name",  m_Name},       
-                      {"Order", m_Order},       
+                      {"Name",  m_Name},
+                      {"Order", m_Order},
                       {"Type",  tp},
-                      {"Nullable", m_Type!=m_NonNullableType}
+                      {"Nullable", typeIsNullable}
                     };
 
                     if (attr!=null)
@@ -389,7 +402,52 @@ namespace NFX.DataAccess.CRUD
                     return local;
             }
             
+
+            public static Schema FromJSON(string json, bool readOnly = false)
+            {
+              return FromJSON(JSONReader.DeserializeDataObject( json ) as JSONDataMap, readOnly);
+            }
             
+            public static Schema FromJSON(JSONDataMap map, bool readOnly = false)
+            {
+              if (map==null || map.Count==0)
+                 throw new CRUDException(StringConsts.ARGUMENT_ERROR+"Schema.FromJSON(map==null|empty)");
+
+              var name = map["Name"].AsString();
+              if (name.IsNullOrWhiteSpace())
+                throw new CRUDException(StringConsts.ARGUMENT_ERROR+"Schema.FromJSON(map.Name=null|empty)");
+
+              var adefs = map["FieldDefs"] as JSONDataArray;
+              if (adefs==null || adefs.Count==0)
+                throw new CRUDException(StringConsts.ARGUMENT_ERROR+"Schema.FromJSON(map.FieldDefs=null|empty)");
+
+              var defs = new List<Schema.FieldDef>();
+              foreach(var mdef in adefs.Cast<JSONDataMap>())
+              {
+                var fname = mdef["Name"].AsString();
+                if (fname.IsNullOrWhiteSpace())
+                  throw new CRUDException(StringConsts.ARGUMENT_ERROR+"Schema.FromJSON(map.FierldDefs[name=null|empty])");
+                var req = mdef["IsRequired"].AsBool();
+                var key = mdef["IsKey"].AsBool();
+                var vis = mdef["Visible"].AsBool();
+
+                var tp = mdef["Type"].AsString(string.Empty).ToLowerInvariant().Trim();
+                var tpn = mdef["Nullable"].AsBool();
+
+                var type = JSONMappings.MapJSONTypeToCLR(tp, tpn);
+
+                var atr = new FieldAttribute(required: req, key: key, visible: vis);
+                var def = new Schema.FieldDef(fname, type, atr);
+                defs.Add(def);
+              }
+
+              return new Schema(name, readOnly, defs);
+            }
+
+
+
+
+
             private static Registry<Schema> s_TypedRegistry = new Registry<Schema>();
 
             
@@ -400,6 +458,15 @@ namespace NFX.DataAccess.CRUD
             public static Schema GetForTypedRow(TypedRow row)
             {
                 return GetForTypedRow(row.GetType());
+            }
+
+            /// <summary>
+            /// Returns schema instance for the TypedRow instance by fetching schema object from cache or
+            ///  creating it if it has not been cached yet
+            /// </summary>
+            public static Schema GetForTypedRow<TRow>() where TRow : TypedRow
+            {
+                return GetForTypedRow(typeof(TRow));
             }
 
 
@@ -451,7 +518,28 @@ namespace NFX.DataAccess.CRUD
                       var order = 0;
                       foreach(var prop in props)
                       {
-                          var fattrs = prop.GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>();
+                          var fattrs = prop.GetCustomAttributes(typeof(FieldAttribute), false)
+                                           .Cast<FieldAttribute>()
+                                           .ToArray();
+                          
+                          //20160318 DKh. Interpret [Field(CloneFromType)]
+                          for(var i=0; i<fattrs.Length; i++)
+                          {
+                            var attr = fattrs[i];
+                            if (attr.CloneFromRowType==null) continue;
+                            
+                            if (fattrs.Length>1)
+                             throw new CRUDException(StringConsts.CRUD_TYPED_ROW_SINGLE_CLONED_FIELD_ERROR.Args(trow.FullName, prop.Name));
+                            
+                            var clonedSchema = Schema.GetForTypedRow(attr.CloneFromRowType);
+                            var clonedDef = clonedSchema[prop.Name];
+                            if (clonedDef==null)
+                             throw new CRUDException(StringConsts.CRUD_TYPED_ROW_CLONED_FIELD_NOTEXISTS_ERROR.Args(trow.FullName, prop.Name));
+                           
+                            fattrs = clonedDef.Attrs.ToArray();//replace these attrs from the cloned target
+                            break;
+                          }
+
                           var fdef = new FieldDef(prop.Name, order, prop.PropertyType, fattrs, prop);
                           m_FieldDefs.Register(fdef);
 
@@ -507,8 +595,6 @@ namespace NFX.DataAccess.CRUD
                 }
 
             }
-
-
 
         #endregion
 

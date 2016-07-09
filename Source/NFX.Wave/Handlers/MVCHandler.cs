@@ -20,6 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.Drawing;
+using System.IO;
 
 using NFX.Web;
 using NFX.Environment;
@@ -71,8 +72,8 @@ namespace NFX.Wave.Handlers
          
           
           if (mi==null)
-            throw new HTTPStatusException(SysConsts.STATUS_404, 
-                                          SysConsts.STATUS_404_DESCRIPTION,
+            throw new HTTPStatusException(WebConsts.STATUS_404, 
+                                          WebConsts.STATUS_404_DESCRIPTION,
                                           StringConsts.MVCCONTROLLER_ACTION_UNMATCHED_HANDLER_ERROR.Args(target.GetType().FullName, action));
             
           Security.Permission.AuthorizeAndGuardAction(mi, work.Session, () => work.NeedsSession());
@@ -142,8 +143,8 @@ namespace NFX.Wave.Handlers
 
         if (gInfo==null) //action unknown
         {
-          throw new HTTPStatusException(SysConsts.STATUS_404, 
-                                        SysConsts.STATUS_404_DESCRIPTION,
+          throw new HTTPStatusException(WebConsts.STATUS_404, 
+                                        WebConsts.STATUS_404_DESCRIPTION,
                                         StringConsts.MVCCONTROLLER_ACTION_UNKNOWN_ERROR.Args(tp.DisplayNameWithExpandedGenericArgs(), action));
         }
 
@@ -191,15 +192,27 @@ namespace NFX.Wave.Handlers
           }
           if (typeof(TypedRow).IsAssignableFrom(ctp))
           {
-            args[i] = JSONReader.ToRow(ctp, requested);
-            continue;
+            try
+            {
+              args[i] = JSONReader.ToRow(ctp, requested);
+              continue;
+            }
+            catch(Exception error)
+            {
+              throw new HTTPStatusException(WebConsts.STATUS_400, 
+                                            WebConsts.STATUS_400_DESCRIPTION,
+                                            error.ToMessageWithType(),
+                                            error);
+            }
           } 
         }
-              
+
         for(var i=0; i<args.Length; i++)
         {
+          if (args[i]!=null) continue;
+
           var mp = mpars[i];
-                
+
           var got = requested[mp.Name];
 
           if (got==null)
@@ -208,6 +221,30 @@ namespace NFX.Wave.Handlers
             continue;
           }
           
+          if (got is byte[])
+          {
+            if (mp.ParameterType==typeof(byte[]))
+            {
+              args[i] = got;
+              continue;
+            }
+            if (mp.ParameterType==typeof(Stream) || mp.ParameterType==typeof(MemoryStream))
+            {
+              args[i] = new MemoryStream((byte[])got, false);
+              continue;
+            }
+            if (strictParamBinding)
+             throw new HTTPStatusException(Web.WebConsts.STATUS_400, 
+                                        Web.WebConsts.STATUS_400_DESCRIPTION,
+                                        StringConsts.MVCCONTROLLER_ACTION_PARAM_BINDER_ERROR
+                                                    .Args(
+                                                          controller.GetType().DisplayNameWithExpandedGenericArgs(),
+                                                          strictParamBinding ? "strict" : "relaxed",
+                                                          action,
+                                                          mp.Name,
+                                                          mp.ParameterType.DisplayNameWithExpandedGenericArgs(), "byte[]" )); 
+          }//got byte[]
+
           var strVal = got.AsString();
           try
           {      
@@ -217,8 +254,8 @@ namespace NFX.Wave.Handlers
           {
             const int MAX_LEN = 30;
             if (strVal.Length>MAX_LEN) strVal = strVal.Substring(0, MAX_LEN)+"...";
-            throw new HTTPStatusException(SysConsts.STATUS_400, 
-                                        SysConsts.STATUS_400_DESCRIPTION,
+            throw new HTTPStatusException(WebConsts.STATUS_400, 
+                                         WebConsts.STATUS_400_DESCRIPTION,
                                         StringConsts.MVCCONTROLLER_ACTION_PARAM_BINDER_ERROR
                                                     .Args(
                                                           controller.GetType().DisplayNameWithExpandedGenericArgs(),
