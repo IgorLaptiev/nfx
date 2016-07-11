@@ -248,8 +248,3 @@ function showConfirmationDialog(){
 ...
 <button onclick="showConfirmationDialog();">Show Confirmation Dialog</button>
 ```
-
-
- 
- 
- 
