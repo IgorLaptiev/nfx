@@ -36,7 +36,7 @@ namespace NFX.Web.EMail
   /// <summary>
   /// Base for ALL implementations that work under MailerService
   /// </summary>
-  public abstract class MailerSink : Service<MailerService>, IMailerSink, IConfigurable
+  public abstract class MailerSink : ServiceWithInstrumentationBase<MailerService>, IMailerSink, IConfigurable
   {
       protected MailerSink(MailerService director) : base(director)
       {

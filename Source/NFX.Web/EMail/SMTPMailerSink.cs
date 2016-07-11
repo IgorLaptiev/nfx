@@ -151,5 +151,7 @@ namespace NFX.Web.EMail
                 m_Smtp.Send(email);
            }
     }
+
+      public override bool InstrumentationEnabled { get; set; }
   }
 }

@@ -74,9 +74,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ContentType.cs" />
+    <Compile Include="EMail\Instrumentation\Gauges.cs" />
     <Compile Include="EMail\MailerService.cs" />
     <Compile Include="EMail\IMailer.cs" />
     <Compile Include="EMail\MailerSink.cs" />
+    <Compile Include="EMail\MailgunMailerSink.cs" />
     <Compile Include="EMail\NOPMailer.cs" />
     <Compile Include="EMail\SMTPMailerSink.cs" />
     <Compile Include="GeoLookup\BinaryTree.cs" />
