@@ -17,12 +17,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Threading;
 using NFX.Environment;
 using NFX.Financial;
 using NFX.Instrumentation;
 using NFX.Log;
+using NFX.Serialization.JSON;
 
 namespace NFX.Web.EMail
 {
@@ -206,10 +208,33 @@ namespace NFX.Web.EMail
                     {
                         Type = MessageType.Error,
                         From = this.GetType().FullName,
-                        Text = string.Format("Mail sending failed:{0}",  Result.message)
+                        Text = string.Format("Mail sending failed:{0}", Result.message)
                     });
                     StatSendError();
                 }
+            }
+            catch (System.Net.WebException wex)
+            {
+                if (wex.Response != null)
+                {
+                    using (var errorResponse = (HttpWebResponse)wex.Response)
+                    {
+                        using (var reader = new StreamReader(errorResponse.GetResponseStream()))
+                        {
+                            string error = reader.ReadToEnd();
+                            var jsonError = error.IsNotNullOrWhiteSpace() ? error.JSONToDynamic() : null;
+                            App.Log.Write(new Message
+                            {
+                                Type = MessageType.Error,
+                                From = this.GetType().FullName,
+                                Text = string.Format("Mail sending failed:{0}", jsonError ==null? "Unknown error":jsonError.message)
+                            });
+
+                        }
+                    }
+                }
+                StatSendError();
+                throw;
             }
             catch (Exception e)
             {
